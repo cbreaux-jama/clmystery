@@ -31,17 +31,34 @@ To figure out whodunit, you need access to a command line.
 
 Once you're ready, clone this repo, or [download it as a zip file](https://github.com/veltman/clmystery/archive/master.zip).
 
-Open a Terminal, go to the location of the files, and start by reading the file 'instructions'.
+Open a Terminal, go to the location of the files, and launch the game:
 
-One way you can do this is with the command:
+	python3 game.py
 
-	cat instructions
+The game opens a guided, shell-like prompt with commands such as `ls`, `cd`,
+`cat`, `grep`, `awk`, `head`, `tail`, and `wc`. Use `hint` for a clue,
+`check NAME` to check an answer, `solution` to reveal it, and `cheatsheet` for
+a built-in command reference. Press Tab to complete commands and case-file
+paths.
 
-(`cat` is a command that will print the contents of the file called `instructions` for you to read.)
+After a correct answer, the game displays the successfully executed commands
+and the elapsed time in minutes.
 
-To get started on how to use the command line, open cheatsheet.md or cheatsheet.pdf (from the command line, you can type 'nano cheatsheet.md').
+Colors are enabled automatically in supported interactive terminals. Use
+`python3 game.py --color always` or `python3 game.py --color never` to override
+automatic detection.
 
-Don't use a text editor to view any files except these instructions, the cheatsheet, and hints.
+The assigned mystery is saved between launches so a player can resume the same
+case. To switch cases while testing locally, run `python3 game.py --new-case`.
+
+The prompt intentionally supports only a subset of a real shell; it does not
+run arbitrary operating-system commands or support file-writing redirection.
+The files are still present in a local clone, so this is a guided game
+interface rather than a security boundary. Do not use a text editor to inspect
+the case files if you want to solve the mystery as intended.
+
+Use the in-game `cheatsheet` command while playing. For command-line practice
+outside the game, see cheatsheet.md or cheatsheet.pdf.
 
 ### Credits
 

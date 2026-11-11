@@ -21,21 +21,17 @@ OOOOOOOo`@@a                  aa@@  @@@@@@@""         a@        @@@@ OOOO9
 OOOOOOO'  `@@a               @@a@@   @@""           a@@   a     |@@@ OOOO3
 `OOOO'       `@    aa@@       aaa"""          @a        a@     a@@@',OOOO'
 
+There's been a crime in Terminal City, and the police need your help.
 
-There's been a murder in Terminal City, and TCPD needs your help.
+Your first stop is the `crimescene` file. The officers recorded EVERYTHING in
+their reports, but the sergeant marked the important evidence with `CLUE` in
+all caps. Collect those clues before following the trail.
 
-To figure out whodunit, go to the 'mystery' subdirectory and start working from there.
+Use `help` to see the available commands, `hint` or `hint NUMBER` for a clue,
+`check NAME` to validate your answer, and `solution` to reveal it. For a
+command reference, use `cheatsheet` or `cheatsheet TOPIC` for a section such
+as `navigation`, `files`, `search`, or `pipes`. Press Tab to complete commands
+and file paths.
 
-You'll want to start by collecting all the clues at the crime scene (the 'crimescene' file).
-
-The officers on the scene are pretty meticulous, so they've written down EVERYTHING in their officer reports.
-
-Fortunately the sergeant went through and marked the real clues with the word "CLUE" in all caps.
-
-If you get stuck, open one of the hint files (from the CL, type 'cat hint1', 'cat hint2', etc.).
-
-To check your answer or find out the solution, open the file 'solution' (from the CL, type 'cat solution').
-
-To get started on how to use the command line, open cheatsheet.md or cheatsheet.pdf (from the command line, you can type 'nano cheatsheet.md').
-
-Don't use a text editor to view any files except these instructions, the cheatsheet, and hints.
+When your terminal supports color, hints, answer feedback, and grep matches
+are highlighted automatically.
