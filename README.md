@@ -39,7 +39,7 @@ The game opens a guided, shell-like prompt with commands such as `ls`, `cd`,
 `cat`, `grep`, `awk`, `head`, `tail`, and `wc`. Use `hint` for a clue,
 `check NAME` to check an answer, `solution` to reveal it, and `cheatsheet` for
 a built-in command reference. Press Tab to complete commands and case-file
-paths.
+paths. Tab completion supports GNU Readline and macOS's libedit.
 
 After a correct answer, the game displays the successfully executed commands
 and the elapsed time in minutes.

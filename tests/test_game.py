@@ -1,6 +1,8 @@
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import ModuleType
 from io import StringIO
 from contextlib import redirect_stdout
 from unittest.mock import patch
@@ -227,6 +229,20 @@ class GameTests(unittest.TestCase):
         if player.enable_tab_completion():
             self.assertIsNotNone(player.readline_module)
             self.assertEqual(player.readline_module.get_completer(), player.readline_complete)
+
+    def test_tab_completion_uses_libedit_binding_on_macos(self):
+        readline = ModuleType("readline", "Command line editing using libedit.")
+        bindings = []
+        readline.set_completer = lambda completer: None
+        readline.set_completer_delims = lambda delimiters: None
+        readline.parse_and_bind = bindings.append
+        player = game.Game(game.CASES["original"])
+
+        with patch.dict(sys.modules, {"readline": readline}):
+            self.assertTrue(player.enable_tab_completion())
+
+        self.assertEqual(bindings, ["bind ^I rl_complete"])
+        self.assertEqual(player.readline_module, readline)
 
     def test_terminal_feedback_and_grep_matches_can_be_colored(self):
         player = game.Game(game.CASES["gallery"], color_enabled=True)

@@ -522,7 +522,12 @@ class Game:
         self.readline_module = readline
         readline.set_completer(self.readline_complete)
         readline.set_completer_delims(" \t\n")
-        readline.parse_and_bind("tab: complete")
+        binding = (
+            "bind ^I rl_complete"
+            if "libedit" in (readline.__doc__ or "").casefold()
+            else "tab: complete"
+        )
+        readline.parse_and_bind(binding)
         return True
 
     def command_ls(self, args: list[str]) -> str:
