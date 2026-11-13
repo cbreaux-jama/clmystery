@@ -12,11 +12,14 @@ import shlex
 import sys
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
 ASSIGNMENT_FILE = ROOT / ".case-assignment"
+RESULTS_DIRECTORY = ROOT
+SLACK_THREAD_URL = "https://grid-jamasoftware.enterprise.slack.com/archives/C0CHG93PY9K"
 
 ORIGINAL_HINTS = (
     "Try poking around with `head -n 20 people` to see what the people file contains.",
@@ -132,7 +135,7 @@ HELP_TEXT = """Available commands:
   cd [directory]              Change directories
   cat FILE [FILE ...]         Print file contents
   grep [OPTIONS] PATTERN FILE Search for text or a regular expression
-      Options: -i -w -n -c -l -r -A N -B N -C N (before or after files)
+      Options: -E -i -w -n -c -l -r -A N -B N -C N (context options may follow files)
   awk [-F SEP] PROGRAM [FILE ...]
                               Print selected fields, optionally matching a pattern or test
   head [-n N] FILE             Print the first lines
@@ -184,6 +187,10 @@ Press Tab to complete game commands and file paths.""",
     Find lines containing CLUE.
   grep -i "annabel" people
     Ignore uppercase/lowercase differences.
+  grep -E "Avery|Jordan" people
+    Search using extended regular-expression syntax.
+  grep -r "Kellan Duarte" memberships/
+    Search all files under a directory.
   grep -w "Annabel" people
     Match a whole word.
   grep -n "Annabel" people
@@ -347,16 +354,36 @@ class Game:
             return self.colorize("CORRECT! GREAT WORK, GUMSHOE.", "1;32")
         return self.colorize("Sorry, that's not the right answer. Keep investigating or use `hint`.", "1;31")
 
-    def session_summary(self) -> str:
+    def session_summary(self, elapsed_minutes: float) -> str:
         commands = "\n".join(
             f"  {index}. {command}"
             for index, command in enumerate(self.successful_commands, start=1)
         )
-        elapsed_minutes = (time.monotonic() - self.started_at) / 60
         return (
             f"Commands used:\n{commands}\n\n"
             f"Time to Complete: {elapsed_minutes:.2f} minutes"
         )
+
+    def write_results(self, summary: str) -> Path:
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        report = (
+            "THE COMMAND LINE MURDERS - GAME RESULTS\n"
+            "CORRECT! GREAT WORK, GUMSHOE.\n"
+            f"Case: {self.case.title}\n"
+            f"Answer: {self.case.answer}\n\n"
+            f"{summary}\n"
+        )
+        suffix = 0
+        while True:
+            unique_suffix = f"-{suffix}" if suffix else ""
+            path = RESULTS_DIRECTORY / f"results-{timestamp}{unique_suffix}.txt"
+            try:
+                with path.open("x", encoding="utf-8") as results_file:
+                    results_file.write(report)
+            except FileExistsError:
+                suffix += 1
+                continue
+            return path.resolve()
 
     def solution(self, args: list[str]) -> str:
         if args:
@@ -577,13 +604,19 @@ class Game:
             elif option == "--":
                 remaining.extend(args[index + 1 :])
                 break
-            elif option in ("-i", "-w", "-n", "-c", "-l", "-r"):
-                ignore_case |= "i" in option[1:]
-                whole_word |= "w" in option[1:]
-                line_numbers |= "n" in option[1:]
-                count_only |= "c" in option[1:]
-                list_files |= "l" in option[1:]
-                recursive |= "r" in option[1:]
+            elif (
+                option.startswith("-")
+                and option != "-"
+                and all(flag in "Eiwnclr" for flag in option[1:])
+            ):
+                # Python regex is already extended; accept -E for grep compatibility.
+                for flag in option[1:]:
+                    ignore_case |= flag == "i"
+                    whole_word |= flag == "w"
+                    line_numbers |= flag == "n"
+                    count_only |= flag == "c"
+                    list_files |= flag == "l"
+                    recursive |= flag == "r"
             elif option.startswith("-") and option != "-":
                 raise ValueError(f"Unsupported grep option: {option}")
             else:
@@ -601,7 +634,17 @@ class Game:
                 if path.is_dir():
                     if not recursive:
                         raise IsADirectoryError(f"Use grep -r to search a directory: {path.name}")
-                    expanded_paths.extend(sorted(item.resolve() for item in path.rglob("*") if item.is_file()))
+                    for item in sorted(path.rglob("*")):
+                        if not item.is_file():
+                            continue
+                        resolved_item = item.resolve()
+                        try:
+                            resolved_item.relative_to(self.root)
+                        except ValueError as exc:
+                            raise ValueError(
+                                "That path is outside the assigned case files."
+                            ) from exc
+                        expanded_paths.append(resolved_item)
                 else:
                     expanded_paths.append(path)
             for path in expanded_paths:
@@ -829,7 +872,16 @@ class Game:
         if not (check_command and not correct_answer):
             self.successful_commands.append(line.strip())
         if correct_answer:
-            return f"{result}\n\n{self.session_summary()}"
+            elapsed_minutes = (time.monotonic() - self.started_at) / 60
+            summary = self.session_summary(elapsed_minutes)
+            results_path = self.write_results(summary)
+            return (
+                f"{result}\n"
+                f"Time to Complete: {elapsed_minutes:.2f} minutes\n\n"
+                f"Results file: {results_path}\n"
+                "Please post this results file to the game Slack thread:\n"
+                f"{SLACK_THREAD_URL}"
+            )
         return result
 
     def run(self) -> None:

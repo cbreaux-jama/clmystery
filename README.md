@@ -41,8 +41,10 @@ The game opens a guided, shell-like prompt with commands such as `ls`, `cd`,
 a built-in command reference. Press Tab to complete commands and case-file
 paths. Tab completion supports GNU Readline and macOS's libedit.
 
-After a correct answer, the game displays the successfully executed commands
-and the elapsed time in minutes.
+After a correct answer, the game displays the elapsed time and saves a
+shareable results file containing the case summary and successfully executed
+commands. It prints the file's full path and the Slack thread where players
+should post it.
 
 Colors are enabled automatically in supported interactive terminals. Use
 `python3 game.py --color always` or `python3 game.py --color never` to override

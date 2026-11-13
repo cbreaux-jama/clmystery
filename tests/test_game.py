@@ -161,6 +161,33 @@ class GameTests(unittest.TestCase):
         self.assertIn("Weight:", before)
         self.assertTrue(before.endswith("License Plate T9W5C84"))
 
+    def test_grep_supports_extended_and_recursive_search(self):
+        harbor = game.Game(game.CASES["harbor"])
+        extended = harbor.execute_line(r"""grep -E 'V8Z.*7|T9W.*5C84' vehicles""")
+        self.assertEqual(
+            set(extended.splitlines()),
+            {
+                "License Plate V8Z2D17",
+                "License Plate V8Z7EF4",
+                "License Plate T9W5C84",
+            },
+        )
+
+        recursive = harbor.execute_line(
+            """grep -Er 'Kellan Duarte|Devin Merritt' ./memberships/"""
+        )
+        self.assertEqual(
+            set(recursive.splitlines()),
+            {
+                "memberships/AAdvantage:Kellan Duarte",
+                "memberships/Costco:Kellan Duarte",
+                "memberships/United_MileagePlus:Kellan Duarte",
+                "memberships/AAA:Devin Merritt",
+                "memberships/REI:Devin Merritt",
+                "memberships/Rotary_Club:Devin Merritt",
+            },
+        )
+
     def test_all_case_answers_validate(self):
         for case in game.CASES.values():
             with self.subTest(case=case.key):
@@ -200,6 +227,8 @@ class GameTests(unittest.TestCase):
         self.assertIn("SEARCHING", reference)
         self.assertIn("PIPES", reference)
         self.assertIn("awk -F", reference)
+        self.assertIn('grep -E "Avery|Jordan" people', reference)
+        self.assertIn('grep -r "Kellan Duarte" memberships/', reference)
         self.assertIn('if ($3 == "M")', reference)
         navigation = player.execute_line("cheatsheet navigation").splitlines()
         self.assertEqual(navigation[1], "  pwd")
@@ -233,8 +262,8 @@ class GameTests(unittest.TestCase):
     def test_tab_completion_uses_libedit_binding_on_macos(self):
         readline = ModuleType("readline", "Command line editing using libedit.")
         bindings = []
-        readline.set_completer = lambda completer: None
-        readline.set_completer_delims = lambda delimiters: None
+        readline.set_completer = lambda _: None
+        readline.set_completer_delims = lambda _: None
         readline.parse_and_bind = bindings.append
         player = game.Game(game.CASES["original"])
 
@@ -247,7 +276,11 @@ class GameTests(unittest.TestCase):
     def test_terminal_feedback_and_grep_matches_can_be_colored(self):
         player = game.Game(game.CASES["gallery"], color_enabled=True)
         self.assertIn("\033[1;33m", player.execute_line("hint"))
-        self.assertIn("\033[1;32m", player.execute_line("check Devin Merritt"))
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(game, "RESULTS_DIRECTORY", Path(temp_dir)):
+                self.assertIn(
+                    "\033[1;32m", player.execute_line("check Devin Merritt")
+                )
         self.assertIn("\033[1;31m", player.execute_line("check wrong"))
         matches = player.execute_line('grep "Q7X" vehicles')
         self.assertIn("\033[1;31mQ7X\033[0m", matches)
@@ -260,26 +293,53 @@ class GameTests(unittest.TestCase):
             player.execute_line("ll")
         player.execute_line("check wrong")
 
-        with patch("game.time.monotonic", return_value=player.started_at + 60):
-            result = player.execute_line("check Devin Merritt")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            results_directory = Path(temp_dir)
+            with patch.object(game, "RESULTS_DIRECTORY", results_directory):
+                with patch("game.time.monotonic", return_value=player.started_at + 60):
+                    result = player.execute_line("check Devin Merritt")
 
-        self.assertIn("CORRECT! GREAT WORK, GUMSHOE.", result)
-        self.assertIn("  1. pwd", result)
-        self.assertIn('  2. grep "CLUE" crimescene', result)
-        self.assertIn("  3. check Devin Merritt", result)
-        self.assertNotIn("ll", result)
-        self.assertNotIn("check wrong", result)
-        self.assertIn("Time to Complete: 1.00 minutes", result)
+            self.assertIn("CORRECT! GREAT WORK, GUMSHOE.", result)
+            self.assertIn("Time to Complete: 1.00 minutes", result)
+            self.assertIn("Please post this results file to the game Slack thread:", result)
+            self.assertIn(game.SLACK_THREAD_URL, result)
+            self.assertNotIn("Commands used:", result)
+            result_path = Path(
+                next(
+                    line.removeprefix("Results file: ")
+                    for line in result.splitlines()
+                    if line.startswith("Results file: ")
+                )
+            )
+            self.assertEqual(result_path.parent, results_directory)
+            self.assertTrue(result_path.is_file())
+
+            report = result_path.read_text(encoding="utf-8")
+            self.assertIn("CORRECT! GREAT WORK, GUMSHOE.", report)
+            self.assertIn("Case: The Gallery Job", report)
+            self.assertIn("Answer: Devin Merritt", report)
+            self.assertIn("  1. pwd", report)
+            self.assertIn('  2. grep "CLUE" crimescene', report)
+            self.assertIn("  3. check Devin Merritt", report)
+            self.assertNotIn("\n  ll\n", report)
+            self.assertNotIn("check wrong", report)
+            self.assertIn("Time to Complete: 1.00 minutes", report)
 
     def test_game_starts_in_an_interactive_prompt(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             assignment_file = Path(temp_dir) / ".case-assignment"
+            results_directory = Path(temp_dir) / "results"
+            results_directory.mkdir()
             output = StringIO()
             with patch.object(game, "ASSIGNMENT_FILE", assignment_file):
-                with patch.object(game.secrets, "choice", return_value="gallery"):
-                    with patch("builtins.input", side_effect=["pwd", "check Devin Merritt", "quit"]):
-                        with redirect_stdout(output):
-                            self.assertEqual(game.main(["--color", "always"]), 0)
+                with patch.object(game, "RESULTS_DIRECTORY", results_directory):
+                    with patch.object(game.secrets, "choice", return_value="gallery"):
+                        with patch(
+                            "builtins.input",
+                            side_effect=["pwd", "check Devin Merritt", "quit"],
+                        ):
+                            with redirect_stdout(output):
+                                self.assertEqual(game.main(["--color", "always"]), 0)
             self.assertIn("THE COMMAND LINE MURDERS", output.getvalue())
             self.assertIn(".OOOOOOOOOOOOOOO", output.getvalue())
             self.assertIn("\033[1;36mTHE COMMAND LINE MURDERS\033[0m", output.getvalue())
@@ -295,10 +355,9 @@ class GameTests(unittest.TestCase):
             self.assertNotIn("Color key:", output.getvalue())
             self.assertNotIn("security boundary", output.getvalue())
             self.assertIn("CORRECT", output.getvalue())
-            self.assertIn("Commands used:", output.getvalue())
-            self.assertIn("  1. pwd", output.getvalue())
-            self.assertIn("  2. check Devin Merritt", output.getvalue())
             self.assertIn("Time to Complete:", output.getvalue())
+            self.assertIn("Results file:", output.getvalue())
+            self.assertIn(game.SLACK_THREAD_URL, output.getvalue())
 
             title = "\033[1;36mTHE COMMAND LINE MURDERS\033[0m"
             art = (game.ROOT / "instructions").read_text(encoding="utf-8").partition(

@@ -1,3 +1,4 @@
 .case-assignment
+results-*.txt
 __pycache__/
 *.py[cod]
